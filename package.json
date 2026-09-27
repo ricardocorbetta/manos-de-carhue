@@ -1,0 +1,19 @@
+{
+  "name": "xenom-tableros",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tableros de gestión diaria para clientes de Xenom (Vercel + Neon).",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.9.6"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.2.17"
+  },
+  "scripts": {
+    "dev": "node dev/server.mjs"
+  }
+}

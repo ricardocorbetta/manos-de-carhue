@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Instalación · Tablero</title>
+<style>
+:root{--ink:#1f1716;--ink2:#5c5250;--line:#e6e0de;--brand:#AE1A1A;--bg:#f7f5f4;--good:#1c7a45;--bad:#c23b22}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:32px 16px;display:grid;gap:16px}
+h1{margin:0;font-size:28px}
+fieldset{border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px;background:#fff}
+legend{font-weight:700;padding:0 6px}
+label{display:grid;gap:4px;font-size:14px;color:var(--ink2);font-weight:600}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+.row{display:grid;grid-template-columns:1fr 1fr 140px;gap:8px}
+@media (max-width:520px){.row{grid-template-columns:1fr}}
+button{font:inherit;font-weight:700;border:0;border-radius:8px;padding:12px 16px;background:var(--brand);color:#fff;cursor:pointer}
+button.sec{background:#fff;color:var(--ink);border:1px solid var(--line)}
+pre{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px;white-space:pre-wrap}
+.ok{color:var(--good)}.err{color:var(--bad)}
+.check{display:flex;gap:8px;align-items:center;font-weight:400;color:var(--ink)}
+</style>
+</head>
+<body>
+<main>
+<h1>Instalación del tablero</h1>
+<p>Se usa una sola vez por cliente, o cuando hay que agregar usuarios o cambiar contraseñas. Pide el código de instalación (variable <code>SETUP_TOKEN</code> en Vercel).</p>
+<form id="f">
+<fieldset><legend>Código</legend><label for="token">Código de instalación<input id="token" type="password" required autocomplete="off"></label></fieldset>
+<fieldset><legend>Cliente</legend>
+<label for="cid">Identificador (letras, números y guiones)<input id="cid" value="manos-carhue" required></label>
+<label for="cnom">Nombre<input id="cnom" value="Manos de Carhué" required></label>
+<label class="check"><input type="checkbox" id="seed" checked> Cargar metas, plan y ventas iniciales (solo si el cliente todavía no tiene datos)</label>
+</fieldset>
+<fieldset id="us"><legend>Usuarios</legend></fieldset>
+<button type="button" class="sec" id="add">Agregar usuario</button>
+<button type="submit">Instalar / actualizar</button>
+</form>
+<pre id="out" hidden></pre>
+</main>
+<script>
+var us=document.getElementById('us'), n=0;
+function fila(u,r){n++;var d=document.createElement('div');d.className='row';
+ d.innerHTML='<label for="u'+n+'">Usuario<input id="u'+n+'" class="u" value="'+(u||'')+'" autocapitalize="none"></label><label for="p'+n+'">Contraseña (mín. 8)<input id="p'+n+'" class="p" type="password" autocomplete="new-password"></label><label for="r'+n+'">Rol<select id="r'+n+'" class="r"><option value="encargado">Encargado</option><option value="equipo">Equipo</option><option value="admin">Admin</option></select></label>';
+ us.appendChild(d); d.querySelector('.r').value=r||'encargado';}
+fila('joaquin','encargado'); fila('equipo.manos','equipo'); fila('ricardo','admin');
+document.getElementById('add').onclick=function(){fila('','equipo');};
+document.getElementById('f').onsubmit=function(ev){ev.preventDefault();var o=document.getElementById('out');o.hidden=false;o.className='';o.textContent='Instalando…';
+ var usuarios=[].slice.call(us.querySelectorAll('.row')).map(function(d){return {usuario:d.querySelector('.u').value,clave:d.querySelector('.p').value,rol:d.querySelector('.r').value};}).filter(function(x){return x.usuario&&x.clave;});
+ fetch('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:document.getElementById('token').value,cliente_id:document.getElementById('cid').value,cliente_nombre:document.getElementById('cnom').value,cargar_datos:document.getElementById('seed').checked,usuarios:usuarios})})
+ .then(function(r){return r.json().then(function(j){return [r.ok,j];});}).then(function(x){o.className=x[0]?'ok':'err';o.textContent=x[0]?('Listo.\nCliente: '+x[1].cliente+'\nUsuarios: '+(x[1].usuarios.join(', ')||'ninguno')+'\nDatos iniciales: '+x[1].datos_iniciales+'\n\nYa se puede ingresar en la página principal.'):(x[1].error||'Error');})
+ .catch(function(){o.className='err';o.textContent='No se pudo conectar.';});};
+</script>
+</body>
+</html>
