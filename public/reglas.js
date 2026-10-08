@@ -39,6 +39,16 @@ function MC_compute(rows){
     RULES.forEach(function(R){ var trig=R.trig.some(function(x){return B.g[x]||x==='*';}); if(!trig) return;
       var hit=R.offer.some(function(x){return B.g[x];}); var e=D.r[R.id]||(D.r[R.id]=[0,0]); e[0]++; if(hit) e[1]++; });
   });
+  // Total del día con TODAS las ventas del reporte de Odoo (mostrador, pedidos, organizaciones y Aberasturi): se usa para el objetivo del mes.
+  var tot={};
+  rows.forEach(function(r){
+    var day=String(r.fecha||'').slice(0,10), t=+r.total||0; if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!t) return;
+    var T=tot[day]||(tot[day]={vt:0,va:0}); T.vt+=t; if(/ABERASTURI/.test(String(r.cliente||'').toUpperCase())) T.va+=t;
+  });
+  Object.keys(tot).forEach(function(k){
+    var D=days[k]||(days[k]={fecha:k,tickets:0,venta:0,items:0,multi:0,prop:0,vprop:0,r:{}});
+    D.vt=Math.round(tot[k].vt); D.va=Math.round(tot[k].va);
+  });
   return Object.keys(days).sort().map(function(k){var D=days[k]; D.venta=Math.round(D.venta); D.vprop=Math.round(D.vprop); return D;});
 }
 var MC_RULES=[

@@ -22,6 +22,7 @@ Tablero diario por cliente (primero: Manos de Carhué). Vista **Equipo** (lúdic
 
 - Joaquín (encargado), a primera hora: Odoo → Punto de Venta → Reportes → Análisis de ventas → exportar a Excel (Fecha de la orden, Orden, Variante del producto, Cliente, Total) → en el tablero, "Cargar ventas del día y metas" → subir → **Guardar**.
 - El equipo ve su vista con el usuario del local. La pantalla se actualiza sola cada 5 minutos.
+- **Objetivo de ventas del mes**: se carga en "Cargar ventas del día y metas" → punto 3, en millones de pesos. Cuenta todas las ventas del reporte de Odoo (mostrador, pedidos, organizaciones y Aberasturi). El encargado ve el monto, la proyección de cierre y lo que falta por día; el equipo ve solo el porcentaje de avance.
 
 ## Agregar un cliente o cambiar contraseñas
 

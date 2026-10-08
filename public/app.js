@@ -18,7 +18,8 @@ function previewBanner(){return hoyReal()<hoy()?'<div class="preview">Vista prev
 function metaDia(f){if(f<(STATE.metas.inicio||'')) return 0; var e=STATE.metas.especiales[f];return +(e!=null?e:STATE.metas.tkDia[wd(f)])||0;}
 function nota(f){return (STATE.notas||{})[f]||'';}
 function cerrado(f){return metaDia(f)===0;}
-function byDate(){var m={};STATE.dias.forEach(function(d){m[d.fecha]=d;});return m;}
+function diasPOS(){return STATE.dias.filter(function(d){return d.tickets>0;});}
+function byDate(){var m={};diasPOS().forEach(function(d){m[d.fecha]=d;});return m;}
 function estado(real,meta){if(real==null||!meta||isNaN(real)) return null;var r=real/meta;return r>=1?'good':(r>=0.95?'warn':'bad');}
 var ST_TXT={good:'✓ En meta',warn:'● Cerca',bad:'▼ Debajo'};
 function pill(s){return s?'<span class="st '+s+'">'+ST_TXT[s]+'</span>':'';}
@@ -34,7 +35,7 @@ function periodoFechas(){
   if(VIEW.periodo==='semana') return semana(VIEW.wk);
   if(VIEW.periodo==='hoy'||VIEW.periodo==='plan') return semana(0);
   if(VIEW.periodo==='mes') return mesFechas();
-  var ds=STATE.dias; return ds.length?[ds[ds.length-1].fecha]:[];
+  var ds=diasPOS(); return ds.length?[ds[ds.length-1].fecha]:[];
 }
 // aggregate over a list of dates: real only on days with data; meta for those same days
 function agg(fechas){
@@ -50,7 +51,7 @@ function agg(fechas){
   a.rMeta={}; MC_RULES.forEach(function(R){var e=a.r[R.id]; a.rMeta[R.id]=e&&e[0]?a.rm[R.id]/e[0]:+STATE.metas.rules[R.id];});
   return a;
 }
-function ultimaFecha(){var ds=STATE.dias;return ds.length?ds[ds.length-1].fecha:'';}
+function ultimaFecha(){var ds=diasPOS();return ds.length?ds[ds.length-1].fecha:'';}
 
 function kpiCard(label,val,meta,fmtV,fmtM,extra){
   var s=estado(val,meta), pct=meta&&val!=null?Math.min(val/meta,1.25):0;
@@ -69,7 +70,7 @@ function caMeta(f){var v=STATE.metas.caseroDia&&STATE.metas.caseroDia[wd(f)];ret
 function dec(v){return nf(v,1);}
 var _PERF=null;
 function perfil(){ if(_PERF) return _PERF; var ini=STATE.metas.inicio||'2026-09-28';
-  var ds=STATE.dias.filter(function(d){return d.fecha<ini;}).slice(-84), P={};
+  var ds=diasPOS().filter(function(d){return d.fecha<ini;}).slice(-84), P={};
   ds.forEach(function(d){var w=wd(d.fecha),p=P[w]||(P[w]={n:0,t:0,v:0,m:0,rr:{}});p.n++;p.t+=d.tickets;p.v+=d.venta;p.m+=d.multi;for(var k in d.r){p.rr[k]=p.rr[k]||[0,0];p.rr[k][0]+=d.r[k][0];p.rr[k][1]+=d.r[k][1];}});
   var rec={}; ds.slice(-28).forEach(function(d){var w=wd(d.fecha),q=rec[w]||(rec[w]={n:0,t:0,v:0,m:0});q.n++;q.t+=d.tickets;q.v+=d.venta;q.m+=d.multi;q.i=(q.i||0)+d.items;q.pr=(q.pr||0)+(d.prop||0);});
   for(var w in P){var p=P[w],q=rec[w]||p;p.tk=q.t/q.n;p.ticket=q.t?q.v/q.t:0;p.multi=q.t?q.m/q.t*100:0;p.items=q.t?(q.i||0)/q.t:0;p.casero=q.t?(q.pr||0)/q.t*100:0;p.r={};MC_RULES.forEach(function(R){var e=p.rr[R.id]||[0,0];p.r[R.id]={T:e[0]/p.n,a:e[0]?e[1]/e[0]*100:0};});}
@@ -105,7 +106,7 @@ function tituloPeriodo(fs){
 }
 
 
-function esperado(f){var w=wd(f), xs=STATE.dias.filter(function(d){return wd(d.fecha)===w;}).slice(-4), o={n:xs.length,r:{}};
+function esperado(f){var w=wd(f), xs=diasPOS().filter(function(d){return wd(d.fecha)===w;}).slice(-4), o={n:xs.length,r:{}};
   MC_RULES.forEach(function(R){var s=0;xs.forEach(function(d){s+=(d.r[R.id]||[0,0])[0];});o.r[R.id]=xs.length?s/xs.length:0;});return o;}
 function sg(v,d,suf){if(v==null||isNaN(v))return '–';var s=v>0?'+':(v<0?'−':'');return s+nf(Math.abs(v),d)+(suf||'');}
 
@@ -215,6 +216,58 @@ function confeti(){
   var t0=performance.now();(function fr(ts){var k=(ts-t0)/1800;x.clearRect(0,0,W,H);P.forEach(function(p){p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.r+=.1;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.globalAlpha=Math.max(1-k,0);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);x.restore();});if(k<1)requestAnimationFrame(fr);else c.remove();})(t0);
 }
 
+// ---- objetivo de ventas del mes (todas las ventas de Odoo) ----
+function mesClave(){return hoy().slice(0,7);}
+function mesNombre(){return MESES[+hoy().slice(5,7)-1];}
+// Objetivo inicial por cliente, hasta que el encargado lo guarde desde el formulario.
+var MES_INICIAL={'manos-carhue':{'2026-10':140000000}};
+function mesObjetivo(){var m=STATE.metas.mes||MES_INICIAL[(STATE.cliente||{}).id]||{};var v=+m[mesClave()];return v>0?v:0;}
+function mesTodas(){var t=hoy(),y=+t.slice(0,4),m=+t.slice(5,7),n=new Date(y,m,0).getDate(),ds=[];for(var i=1;i<=n;i++)ds.push(y+'-'+pad(m)+'-'+pad(i));return ds;}
+// peso de cada día dentro del mes: lo que se espera vender según las metas de ese día de la semana (0 = cerrado)
+function pesoDia(f){var e=STATE.metas.especiales[f];return (+(e!=null?e:STATE.metas.tkDia[wd(f)])||0)*tkMeta(f);}
+function mesCalc(){
+  var obj=mesObjetivo(), hr=hoyReal(), all={}; STATE.dias.forEach(function(d){all[d.fecha]=d;});
+  var c={obj:obj,acum:0,most:0,aber:0,sinTotal:0,pT:0,pC:0,acumC:0,diasRest:0,conDato:0,hasta:''};
+  mesTodas().forEach(function(f){var d=all[f],p=pesoDia(f);c.pT+=p;
+    if(d){var v=d.vt!=null?d.vt:d.venta; if(d.vt==null)c.sinTotal++; c.acum+=v;c.most+=d.venta;c.aber+=(d.va||0);c.conDato++;c.hasta=f;
+      if(f<hr){c.pC+=p;c.acumC+=v;} else if(p>0) c.diasRest++;}
+    else if(f>=hr&&p>0) c.diasRest++;
+  });
+  c.esperado=c.pT?obj*c.pC/c.pT:0;                    // dónde deberíamos estar con los días completos cargados
+  c.ritmo=c.esperado?c.acumC/c.esperado:null;
+  c.proy=c.ritmo!=null?c.acumC+c.ritmo*obj*(c.pT-c.pC)/c.pT:null;
+  c.falta=Math.max(obj-c.acum,0); c.porDia=c.diasRest?c.falta/c.diasRest:0;
+  c.pct=obj?c.acum/obj*100:0; c.marca=c.pT?c.pC/c.pT*100:0; c.otros=c.acum-c.most-c.aber;
+  return c;
+}
+function mesEncargado(){
+  var c=mesCalc(); if(!c.obj) return '';
+  var s=c.conDato&&c.esperado?estado(c.acumC,c.esperado):null, sP=c.proy!=null?estado(c.proy,c.obj):null;
+  return '<section class="card proy" id="mes-obj"><div class="proyhead"><div><div class="l">Objetivo de ventas de '+mesNombre()+' · todas las ventas de Odoo</div>'+
+    '<div class="big"><span class="v">'+money(c.acum)+'</span><span class="m"> de '+money(c.obj)+' · '+nf(c.pct)+'%</span></div></div></div>'+
+    '<div class="bar tall" aria-hidden="true"><i class="fill-'+(s||'warn')+'" style="width:'+Math.min(c.pct,100).toFixed(1)+'%"></i>'+(c.conDato?'<b style="left:'+Math.min(c.marca,100).toFixed(1)+'%" title="Dónde deberíamos estar"></b>':'')+'</div>'+
+    '<div class="proygrid">'+
+      '<div><span class="l">A la fecha, con días completos</span><strong>'+(c.pC?money(c.acumC)+' / '+money(c.esperado):'Sin días completos todavía')+'</strong>'+(s?pill(s):'')+'</div>'+
+      '<div><span class="l">Si seguimos a este ritmo</span><strong>'+(c.proy!=null?'cerramos en '+money(c.proy):'–')+'</strong>'+(sP?pill(sP):'')+'</div>'+
+      '<div><span class="l">Para llegar al objetivo</span><strong>'+(c.falta<=0?'Objetivo cumplido':(c.diasRest?money(c.porDia)+' por día en los '+c.diasRest+' días que quedan':'Faltaron '+money(c.falta)))+'</strong>'+
+        (c.falta>0?'<span class="m">faltan '+money(c.falta)+'</span>':'')+'</div>'+
+    '</div>'+
+    '<div class="m">Mostrador '+money(c.most)+' · Organizaciones y pedidos '+money(c.otros)+' · Aberasturi '+money(c.aber)+(c.hasta?' · cargado hasta el '+fcorta(c.hasta):'')+'. La rayita marca dónde deberíamos estar con los días completos cargados, según lo que pesa cada día de la semana.</div>'+
+    (c.sinTotal?'<div class="stale">Hay '+c.sinTotal+' día'+(c.sinTotal>1?'s':'')+' del mes cargado'+(c.sinTotal>1?'s':'')+' solo con el mostrador. Volvé a subir el Excel del mes para sumar organizaciones, pedidos y Aberasturi.</div>':'')+
+    '</section>';
+}
+function mesEquipo(){
+  // El equipo ve solo el porcentaje, con los días completos cargados (sin el día en curso), para comparar contra dónde deberíamos estar.
+  var c=mesCalc(); if(!c.obj) return '';
+  var s=c.pC?estado(c.acumC,c.esperado):null, real=c.acumC/c.obj*100, pct=Math.min(real,100), d1=Math.round(real)===Math.round(c.marca)?1:0;
+  var msg=!c.pC?'Arrancamos el mes. Cada venta suma.':(s==='good'?'<b>Vamos bien.</b> Estamos al día con el objetivo del mes.':(s==='warn'?'<b>Estamos muy cerca</b> del ritmo que necesitamos: a esta altura tendríamos que ir en '+nf(c.marca,d1)+'%.':'<b>Venimos atrasados:</b> a esta altura tendríamos que ir en '+nf(c.marca,d1)+'%.'));
+  return '<section class="eq-obj2" id="mes-eq"><h2 class="eq-h2">Objetivo de ventas de '+mesNombre()+'</h2>'+
+    '<div class="eq-objrow"><span class="eq-num2">'+nf(real,d1)+'%</span><span class="eq-u2">del objetivo del mes</span>'+(s?pill(s):'')+'</div>'+
+    '<div class="bar tall" aria-hidden="true"><i class="anim-bar fill-'+(s||'warn')+'" data-w="'+pct.toFixed(1)+'" style="width:'+pct.toFixed(1)+'%"></i>'+(c.pC?'<b style="left:'+Math.min(c.marca,100).toFixed(1)+'%"></b>':'')+'</div>'+
+    '<div class="eq-objmsg">'+msg+(c.diasRest?' Quedan '+c.diasRest+' días del mes, hoy incluido.':'')+'</div>'+
+    (c.pC?'<div class="m">La rayita negra marca dónde tendríamos que estar hoy.</div>':'')+'</section>';
+}
+
 function objetivoEquipo(){
   var o=STATE.metas.objetivo||{periodo:'semana'}, fs=objFechas(), A=agg(fs), meta=+o.clientes>0?+o.clientes:A.metaTotal, t=hoy();
   var escala=A.metaTotal?meta/A.metaTotal:1, aFecha=Math.round(A.metaT*escala), falta=Math.max(aFecha-A.t,0), pct=meta?Math.min(A.t/meta*100,100):0, marca=meta?Math.min(aFecha/meta*100,100):0;
@@ -255,6 +308,7 @@ function renderEquipo(){
   h+='<section><h2 class="eq-h2">Desafíos de hoy</h2><div class="eq-focos">'+foco.map(function(R){var tr=Math.round(E.r[R.id]),obj=Math.ceil(tr*ruleMeta(R.id,t)/100);
      return '<article class="eq-foco"><span class="area">'+R.area+'</span><h3>'+esc(R.titulo)+'</h3><div class="eq-say">'+esc(R.frase)+'</div><div class="eq-obj">Desafío: <b data-to="'+obj+'">'+obj+'</b> ventas hoy</div></article>';}).join('')+'</div>'+(FD.ref?'<div class="eq-ref">Ayer también quedó flojo: <b>'+esc(ruleById(FD.ref).titulo)+'</b>. ¡Reforzarlo!</div>':'')+'</section>';
   h+=objetivoEquipo();
+  h+=mesEquipo();
   var WA=agg(semana(0)); if(WA.conDato) h+=podio(sectorScore(WA.r,function(id){return WA.rMeta[id];}),'Copa de la semana',semNom(l)+' · acumulado');
   // siempre
   h+='<section class="eq-siempre"><h2 class="eq-h2">Siempre ofrecer</h2><div class="eq-cols">'+SECT.map(function(a){return '<div><h3>'+sectNom(a)+'</h3><ul>'+
@@ -349,6 +403,7 @@ function render(){
      (atras?'<div class="stale">Faltan cargar las ventas desde el '+fcorta(falta1)+'.</div>':'')+'</div>'+
      '<div class="hdr-r">'+modoSwitch()+'<div class="pills" role="group" aria-label="Período">'+[['hoy','Hoy'],['semana','Semana'],['mes','Mes'],['plan','Plan 4 semanas']].map(function(p){return '<button type="button" data-p="'+p[0]+'" aria-pressed="'+(VIEW.periodo===p[0])+'">'+p[1]+'</button>';}).join('')+'</div></div></header>';
 
+  if(VIEW.periodo==='hoy'||VIEW.periodo==='mes') h+=mesEncargado();
   if(VIEW.periodo==='hoy') h+=huddle()+proximos7();
   if(VIEW.periodo!=='plan'){
     // projection block
@@ -423,10 +478,12 @@ function render(){
     '</div><div class="note"><b>3. Objetivo que ve el equipo</b><span>Lo define el encargado a partir de lo que baja el directorio. Si se deja vacío, se usa la suma de las metas diarias.</span></div>'+
     '<div class="fields"><label for="ob-per">Período<select id="ob-per"><option value="semana"'+((M.objetivo||{}).periodo!=='mes'?' selected':'')+'>Semana</option><option value="mes"'+((M.objetivo||{}).periodo==='mes'?' selected':'')+'>Mes</option></select></label>'+
     '<label for="ob-cli">Clientes del período<input id="ob-cli" type="number" min="0" placeholder="'+nf(agg(objFechas()).metaTotal)+'" value="'+esc((M.objetivo||{}).clientes||'')+'"></label>'+
-    '<label for="ob-txt" class="wide">Título que ve el equipo<input id="ob-txt" type="text" placeholder="Objetivo de la semana" value="'+esc((M.objetivo||{}).texto||'')+'"></label></div>'+
+    '<label for="ob-txt" class="wide">Título que ve el equipo<input id="ob-txt" type="text" placeholder="Objetivo de la semana" value="'+esc((M.objetivo||{}).texto||'')+'"></label>'+
+    '<label for="ob-mes" class="wide">Objetivo de ventas de '+mesNombre()+', en millones de $ (todas las ventas de Odoo)<input id="ob-mes" type="number" min="0" step="0.1" placeholder="sin objetivo" value="'+(mesObjetivo()?esc(mesObjetivo()/1e6):'')+'"></label></div>'+
     '<label class="fields1" for="mt-esp">Metas especiales por fecha (una por línea, dd/mm/aaaa = clientes)<textarea id="mt-esp" rows="3">'+esc(espTxt)+'</textarea></label>'+
     '<div><button class="btn" id="b-save" type="button">Guardar para el equipo</button></div><div class="msg" id="m-save"></div></div></details>';
-  h+='<footer class="note"><span>Se cuentan las ventas del punto de venta. No se incluyen pedidos de la Municipalidad, Cabaña Tres Marías ni consumos internos.</span>'+
+  h+='<footer class="note"><span>Clientes, ticket y venta cruzada cuentan solo las ventas del punto de venta: no incluyen pedidos de la Municipalidad, Cabaña Tres Marías ni consumos internos.</span>'+
+     '<span>El objetivo de ventas del mes cuenta todo lo que trae el reporte de Odoo: mostrador, pedidos, organizaciones y Aberasturi.</span>'+
      '<span>"Si seguimos a este ritmo" aplica el cumplimiento de los días cargados a la meta de los días que faltan.</span>'+
      '<span>Cada regla se mide sobre el ticket completo: de los clientes que compraron el producto disparador, cuántos se llevaron también lo ofrecido.</span>'+
      '<span>Verde: meta cumplida. Amarillo: hasta 5% debajo. Rojo: más de 5% debajo.</span></footer>';
@@ -468,7 +525,7 @@ function onFile(ev){
   var f=ev.target.files[0]; if(!f) return; VIEW.adminOpen=true;
   if(typeof XLSX==='undefined'){VIEW.msgX=['err','No se pudo cargar el lector de Excel. Revisá la conexión y recargá la página.'];render();return;}
   var rd=new FileReader(); rd.onload=function(){
-    try{ var rows=MC_parse(XLSX,new Uint8Array(rd.result)); var nd=MC_compute(rows); if(!nd.length) throw new Error('El archivo no tiene ventas del punto de venta.');
+    try{ var rows=MC_parse(XLSX,new Uint8Array(rd.result)); var nd=MC_compute(rows); if(!nd.length) throw new Error('El archivo no tiene ventas.');
       var map={}; STATE.dias.forEach(function(d){map[d.fecha]=d;}); var nuevos=0; nd.forEach(function(d){if(!map[d.fecha]) nuevos++; map[d.fecha]=d;});
       STATE.dias=Object.keys(map).sort().map(function(k){return map[k];}).slice(-400);_PERF=null; VIEW.nuevos=(VIEW.nuevos||[]).filter(function(x){return !nd.some(function(y){return y.fecha===x.fecha;});}).concat(nd); VIEW.dirty=true;
       VIEW.msgX=['ok','Se leyeron '+nd.length+' día'+(nd.length>1?'s':'')+' ('+fcorta(nd[0].fecha)+(nd.length>1?' al '+fcorta(nd[nd.length-1].fecha):'')+'), '+nuevos+' nuevo'+(nuevos===1?'':'s')+'. Ya se ve arriba. Tocá "Guardar" para que lo vea el equipo.'];
@@ -483,6 +540,7 @@ function readMetas(){
   M.ticketDia=M.ticketDia||{}; M.multiDia=M.multiDia||{}; [0,1,2,3,4,5,6].forEach(function(i){var a=+$('#tt'+i).value;if(a>0)M.ticketDia[i]=a;var b=+$('#mu'+i).value;if(b>0&&b<=100)M.multiDia[i]=b;});
   MC_RULES.forEach(function(R){var v=+$('#r-'+R.id).value; if(v>0&&v<=100) M.rules[R.id]=v;});
   M.objetivo={periodo:$('#ob-per').value,clientes:(+$('#ob-cli').value>0?+$('#ob-cli').value:null),texto:$('#ob-txt').value.trim()};
+  M.mes=M.mes||{}; var vm=+$('#ob-mes').value; if(vm>0) M.mes[mesClave()]=Math.round(vm*1e6); else delete M.mes[mesClave()];
   var esp={}; $('#mt-esp').value.split('\n').forEach(function(l){var m2=l.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s*=\s*(\d+)/); if(m2) esp[m2[3]+'-'+pad(+m2[2])+'-'+pad(+m2[1])]=+m2[4];}); M.especiales=esp;
 }
 // ---- servidor ----
