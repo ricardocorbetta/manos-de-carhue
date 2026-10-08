@@ -4,6 +4,11 @@ var VIEW={periodo:'hoy',wk:0,modo:(location.hash==='#encargado'?'encargado':'equ
 var DIAS=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
 var DC=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 function $(s){return document.querySelector(s);}
+// ---- estética por cliente ----
+var MARCAS={'manos-carhue':{nombre:'Manos de Carhué',bajada:'Almacén de carnes y fiambres',logo:'/logos/manos-carhue.png',icono:'/logos/manos-carhue-64.png'}};
+function cid(){return (STATE&&STATE.cliente&&STATE.cliente.id)||(SES&&SES.cliente)||'';}
+function aplicarMarca(id){var M=MARCAS[id];var r=document.documentElement;if(M){r.setAttribute('data-marca',id);var fi=document.getElementById('favicon');if(fi)fi.href=M.icono;try{localStorage.setItem('marca',id);}catch(e){}}else r.removeAttribute('data-marca');}
+function marca(){var M=MARCAS[cid()];return M?'<div class="marca"><img class="sello" src="'+M.logo+'" alt=""><div><div class="mn">'+esc(M.nombre)+'</div><div class="ms">'+esc(M.bajada)+'</div></div></div>':'';}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function nf(v,d){return (v==null||isNaN(v)||!isFinite(v))?'–':v.toLocaleString('es-AR',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});}
 function pad(n){return (n<10?'0':'')+n;}
@@ -285,7 +290,7 @@ function objetivoEquipo(){
 function renderEquipo(){
   var t=hoy(), Bd=byDate(), M=STATE.metas, ay=addDays(t,-1), d=(ay>=INI()&&Bd[ay])?Bd[ay]:null, arranque=ay<INI(), l=lunesDe(t);
   var W=agg(semana(0)), mh=metaDia(t), rec=mh+(W.resto?Math.ceil(Math.max(W.metaT-W.t,0)/W.resto):0), E=esperado(t);
-  var h='<header class="top"><div><div class="eyebrow">Manos de Carhué</div><h1 class="eqh">'+DIAS[wd(t)]+' '+fcorta(t)+'</h1><div class="sub">'+semNom(l)+' · día '+(Math.round((D(t)-D(l))/864e5)+1)+' de 7</div>'+previewBanner()+'</div>'+modoSwitch()+'</header>';
+  var h=marca()+'<header class="top"><div><div class="eyebrow">'+(MARCAS[cid()]?'Arranque del día':'Manos de Carhué')+'</div><h1 class="eqh">'+DIAS[wd(t)]+' '+fcorta(t)+'</h1><div class="sub">'+semNom(l)+' · día '+(Math.round((D(t)-D(l))/864e5)+1)+' de 7</div>'+previewBanner()+'</div>'+modoSwitch()+'</header>';
   var rc=racha(), medY=d?[[d.tickets,metaDia(ay)],[d.items/d.tickets,itMeta(ay)],[d.venta/d.tickets,tkMeta(ay)],[(d.prop||0)/d.tickets*100,caMeta(ay)]].filter(function(x){return x[0]>=x[1];}).length:null;
   h+='<div class="chips">'+'<span class="chip fuego'+(rc>0?' on':'')+'">'+ICO.fuego+'<span>Racha: <b>'+rc+'</b> '+(rc===1?'día en meta':'días seguidos en meta')+'</span></span>'+
      (medY!=null?'<span class="chip medal'+(medY>0?' on':'')+'">'+ICO.estrella+'<span>Ayer: <b>'+medY+' de 4</b> medallas</span></span>':'')+'</div>';
@@ -398,7 +403,7 @@ function render(){
   var h='';
   // freshness
   var ayer=addDays(t,-1), falta1=last?addDays(last,1):null; while(falta1&&falta1<=ayer&&cerrado(falta1)) falta1=addDays(falta1,1); var atras=falta1&&falta1<=ayer;
-  h+='<header class="top"><div><div class="eyebrow">Manos de Carhué · Tablero del equipo</div><h1>'+(VIEW.periodo==='hoy'?'Arranque del día':(VIEW.periodo==='plan'?'Plan de acción':'¿Cómo venimos?'))+'</h1><div class="sub">Vista del encargado</div>'+previewBanner()+''+
+  h+=marca()+'<header class="top"><div><div class="eyebrow">'+(MARCAS[cid()]?'Tablero del equipo':'Manos de Carhué · Tablero del equipo')+'</div><h1>'+(VIEW.periodo==='hoy'?'Arranque del día':(VIEW.periodo==='plan'?'Plan de acción':'¿Cómo venimos?'))+'</h1><div class="sub">Vista del encargado</div>'+previewBanner()+''+
      '<div class="sub">'+esc(tituloPeriodo(fs))+' · Datos de Odoo hasta el '+(last?DIAS[wd(last)].toLowerCase()+' '+fcorta(last):'–')+'</div>'+
      (atras?'<div class="stale">Faltan cargar las ventas desde el '+fcorta(falta1)+'.</div>':'')+'</div>'+
      '<div class="hdr-r">'+modoSwitch()+'<div class="pills" role="group" aria-label="Período">'+[['hoy','Hoy'],['semana','Semana'],['mes','Mes'],['plan','Plan 4 semanas']].map(function(p){return '<button type="button" data-p="'+p[0]+'" aria-pressed="'+(VIEW.periodo===p[0])+'">'+p[1]+'</button>';}).join('')+'</div></div></header>';
@@ -559,11 +564,13 @@ function cargarEstado(){return api('/api/estado').then(function(j){
   STATE={metas:j.metas||{tkDia:{},rules:{},especiales:{}},notas:j.notas||{},plan:j.plan||{},dias:j.dias||[],cliente:j.cliente};
   STATE.metas.especiales=STATE.metas.especiales||{}; STATE.metas.rules=STATE.metas.rules||{}; _PERF=null;
   SES={usuario:j.usuario,rol:j.rol,cliente:j.cliente};
+  aplicarMarca(cid());
   if(SES.rol==='equipo') VIEW.modo='equipo';
 });}
 function pantallaLogin(msg){
   STATE=null; SES=null; document.title='Ingresar · Tablero';
-  document.getElementById('app').innerHTML='<main class="login"><div class="login-card"><div class="eyebrow">Tablero de gestión</div><h1>Ingresar</h1>'+
+  var mk=null;try{mk=localStorage.getItem('marca');}catch(e){} if(mk&&MARCAS[mk]) aplicarMarca(mk); var LM=mk&&MARCAS[mk];
+  document.getElementById('app').innerHTML='<main class="login"><div class="login-card">'+(LM?'<div class="login-marca"><img src="'+LM.logo+'" alt=""><b>'+esc(LM.nombre)+'</b></div>':'')+'<div class="eyebrow">Tablero de gestión</div><h1>Ingresar</h1>'+
    '<form id="f-login" novalidate><label for="lg-u">Usuario<input id="lg-u" name="usuario" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>'+
    '<label for="lg-p">Contraseña<input id="lg-p" name="clave" type="password" autocomplete="current-password" required></label>'+
    '<button class="btn" type="submit" id="lg-b">Entrar</button><div class="msg'+(msg?' err':'')+'" id="lg-m" role="alert">'+esc(msg||'')+'</div></form>'+

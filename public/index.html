@@ -4,10 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="theme-color" content="#AE1A1A">
+<meta name="theme-color" content="#AD2728">
+<link rel="icon" id="favicon" href="data:,">
 <title>Tablero</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Cinzel:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
 <style>
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0}img{max-width:100%}[hidden]{display:none!important}
@@ -317,6 +318,43 @@ canvas.confeti{position:fixed;inset:0;pointer-events:none;z-index:50}
 .login-card input:focus-visible{outline:2px solid var(--brand);outline-offset:1px}
 .login-card .btn{font-size:17px;padding:12px}
 
+/* ===== Estética por cliente: Manos de Carhué (sello rojo, fachada crema, madera y pizarrón) ===== */
+:root[data-marca="manos-carhue"]{
+  --bg:#f3ebdf; --surface:#fffaf3; --ink:#2b1d17; --ink2:#6a5347; --muted:#96806f; --line:#e3d5c3; --track:#ece1d2;
+  --brand:#ad2728; --meta:#2b1d17; --good:#2e7a3e; --goodbg:#e4f1e2; --warn:#a36400; --warnbg:#f8ecd2; --bad:#b8401c; --badbg:#f8e2d8;
+  --wood:#7b4b27; --wood2:#5a3518; --board:#1f1c1a; --chalk:#fbf6ee; --cream:#f6e6cf;
+  --fs:"Cinzel",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme: dark){:root[data-marca="manos-carhue"]:not([data-theme="light"]){
+  --bg:#17120f; --surface:#221a15; --ink:#f3e7d8; --ink2:#cdb8a5; --muted:#9c8676; --line:#3a2c23; --track:#31251d;
+  --brand:#e0605a; --meta:#f3e7d8; --good:#6cc487; --goodbg:#183020; --warn:#e5b04f; --warnbg:#342913; --bad:#f08a66; --badbg:#3a1d14;
+  --wood:#8e5a31; --wood2:#a8703f; --board:#0f0d0c; --chalk:#fbf6ee; --cream:#f6e6cf;}}
+:root[data-marca="manos-carhue"][data-theme="dark"]{
+  --bg:#17120f; --surface:#221a15; --ink:#f3e7d8; --ink2:#cdb8a5; --muted:#9c8676; --line:#3a2c23; --track:#31251d;
+  --brand:#e0605a; --meta:#f3e7d8; --good:#6cc487; --goodbg:#183020; --warn:#e5b04f; --warnbg:#342913; --bad:#f08a66; --badbg:#3a1d14;
+  --wood:#8e5a31; --wood2:#a8703f; --board:#0f0d0c; --chalk:#fbf6ee; --cream:#f6e6cf;}
+.marca{display:flex;align-items:center;gap:16px;background:linear-gradient(180deg,#b72d2f 0%,#a42325 100%);color:var(--cream);border-radius:14px 14px 6px 6px;padding:14px 20px 14px 14px;border-bottom:10px solid var(--wood);box-shadow:inset 0 -3px 0 rgba(0,0,0,.18),0 2px 0 var(--wood2)}
+.marca .sello{width:76px;height:76px;flex:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.marca .mn{font-family:var(--fs);font-weight:700;font-size:clamp(22px,4vw,32px);letter-spacing:.08em;line-height:1.05;text-transform:uppercase}
+.marca .ms{font-family:var(--fd);font-weight:600;font-size:clamp(15px,2.4vw,19px);letter-spacing:.14em;text-transform:uppercase;opacity:.92}
+@media (max-width:520px){.marca{gap:12px;padding:10px 14px 10px 10px}.marca .sello{width:56px;height:56px}}
+:root[data-marca] .top{border-top:0;padding-top:0}
+:root[data-marca] .eyebrow{color:var(--wood2);font-family:var(--fs);letter-spacing:.1em}
+:root[data-marca] h1,:root[data-marca] .eq-h2{text-transform:uppercase;letter-spacing:.02em}
+:root[data-marca] .pills button[aria-pressed="true"]{background:var(--wood2);border-color:var(--wood2);color:var(--cream)}
+:root[data-marca] .card,:root[data-marca] .eq-obj2,:root[data-marca] .eq-podio,:root[data-marca] .eq-wk,:root[data-marca] .eq-cols>div,:root[data-marca] details.admin{box-shadow:0 1px 0 var(--line)}
+:root[data-marca] .eq-hoy{background:var(--board);color:var(--chalk);border:10px solid var(--wood);border-radius:6px;box-shadow:inset 0 0 0 2px var(--wood2),inset 0 0 40px rgba(255,255,255,.04)}
+:root[data-marca] .eq-hoy .eq-num,:root[data-marca] .eq-hoy .eq-goals b{color:var(--chalk);letter-spacing:.01em}
+:root[data-marca] .eq-hoy .eq-meta .l{font-family:var(--fd);font-size:20px;letter-spacing:.12em;opacity:.85}
+:root[data-marca] .eq-hoy .eq-goals{border-top-color:rgba(255,255,255,.18)}
+:root[data-marca] .eq-hoy .eq-regla b{color:#ffd9a0}
+:root[data-marca] .eq-foco{border-color:var(--brand);border-top-width:8px}
+:root[data-marca] .eq-say,:root[data-marca] .rule .say,:root[data-marca] .foco .say{font-family:Georgia,"Times New Roman",serif}
+:root[data-marca] .preview{background:var(--wood2);color:var(--cream)}
+:root[data-marca] .login-card{border-top:0;padding-top:0;overflow:hidden}
+.login-marca{display:flex;align-items:center;gap:12px;margin:0 -24px 6px;padding:14px 18px;background:linear-gradient(180deg,#b72d2f,#a42325);color:var(--cream);border-bottom:8px solid var(--wood)}
+.login-marca img{width:60px;height:60px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
+.login-marca b{font-family:var(--fs);font-size:22px;letter-spacing:.08em;text-transform:uppercase;line-height:1.1}
 </style>
 </head>
 <body>
