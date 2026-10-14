@@ -225,7 +225,7 @@ function confeti(){
 function mesClave(){return hoy().slice(0,7);}
 function mesNombre(){return MESES[+hoy().slice(5,7)-1];}
 // Objetivo inicial por cliente, hasta que el encargado lo guarde desde el formulario.
-var MES_INICIAL={'manos-carhue':{'2026-10':140000000}};
+var MES_INICIAL={'manos-carhue':{'2026-10':157000000}};
 function mesObjetivo(){var m=STATE.metas.mes||MES_INICIAL[(STATE.cliente||{}).id]||{};var v=+m[mesClave()];return v>0?v:0;}
 function mesTodas(){var t=hoy(),y=+t.slice(0,4),m=+t.slice(5,7),n=new Date(y,m,0).getDate(),ds=[];for(var i=1;i<=n;i++)ds.push(y+'-'+pad(m)+'-'+pad(i));return ds;}
 // peso de cada día dentro del mes: lo que se espera vender según las metas de ese día de la semana (0 = cerrado)
