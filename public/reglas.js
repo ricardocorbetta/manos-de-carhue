@@ -1,5 +1,23 @@
 // Shared logic: Odoo "Análisis de ventas" rows -> daily team metrics.
 // Used in the page (browser) and in node for seeding. Keep ES5-ish, no deps.
+
+// Familia de producto para el mix (mismas familias que el simulador del encargado).
+var MC_FAMS=[['vac','Vacuno y elaborados de carne'],['pol','Pollo y elaborados de pollo'],['cer','Cerdo, embutidos y secos'],['alm','Almacén, pan, pastas y otros'],['fia','Fiambres y quesos'],['ach','Achuras'],['beb','Bebidas'],['pes','Pescados'],['car','Carbón y leña']];
+function MC_fam(p){
+  p=String(p||'').toUpperCase();
+  if(/^PICADA COMUN/.test(p)) return 'vac';
+  if(/EMPANADA|TAPAS|PIZZA|SORRENTINO|RAVIOL|CAPELLACCI|CAVATELLI|TALLARIN|[NÑ]OQUI|LASAGN|CANELON|FIDEO|^PAN |^PAN$|PASCUALINA|ENSALADA|TORTA|BUDIN|ALFAJOR|MERMELADA|POSTRE|HUEVO|ACEITUNA|ADEREZO|CHIMICHURRI|SALMUERA|CONDIMENTO|SNACK|SOJA|G\. DEL SOL|CALDO|RUB /.test(p)) return 'alm';
+  if(/CHINCHULIN|MOLLEJA|HIGADO|LENGUA|MONDONGO|RI[ÑN]ON|CORAZON|TENDON|RABO|SESO|TRIPA GORDA|CHORIZO DE SANGRE/.test(p)) return 'ach';
+  if(/LANGOSTIN|CAMARON|MEJILLON|SALMON|MERLUZA|PEJERREY|RABAS|KANIKAMA|CALAMAR|ATUN|PESCADO|TRUCHA|ABADEJO|PULPO|MARISCO|CORNALITO/.test(p)) return 'pes';
+  if(/CARBON|LE[ÑN]A/.test(p)) return 'car';
+  if(/COCA|SPRITE|FANTA|SCHWEPPES|CERVEZA|VINO|FERNET|AGUA |JUGO|CORONA|PATAGONIA|STELLA|GIN|SIDRA|QUILMES|IPA|APERITIVO|VERMU|GASEOSA|SODA|7 UP|AQUARIUS|LICOR/.test(p)) return 'beb';
+  if(/POLLO|PECHUGA|PATA MUSLO|ALITA|MENUDO|CARCAZA|SUPREMA|GALLINA/.test(p)) return 'pol';
+  if(/BIFE DE CHORIZO/.test(p)) return 'vac';
+  if(/CERDO|BONDIOLA|PECHITO|CARRE|SOLOMILLO|LECHON|CHULETON DEL JAMON|CHORIZO|MORCILLA|SALCHICHA PARRILLERA|SALAMIN CASERO|SALAME CASERO|JAMON CRUDO CASERO|PANCETA CASERA|LOMITO|PATE CASERO|QUESO DE CERDO/.test(p)) return 'cer';
+  if(/QUESO|JAMON|PALETA COCIDA|MORTADELA|SALAME|CAGNOLI|FIAMBRE|ROQUEFORT|SARDO|REGGIANITO|PATEGRAS|FONTINA|MUZZARELLA|SALCHICHON|LONGANIZA|BOCATTI|PANCETA|PROVOL|CANTIMPALO|^PICADA (MANOS|SUPER|CAMPERA)|COMBO FIAMBRE/.test(p)) return 'fia';
+  if(/VACIO|ASADO|NALGA|CUADRIL|CIMA|CARACU|LOMO|CUADRADA|BIFE|MATAMBRE|PALETA|FALDA|AGUJA|ROAST|COLITA|ENTRA[ÑN]A|PECETO|AMERICANO|CHULETA|PICA[ÑN]A|OSOBUCO|HUESO|PICADA|COSTILLAR|TORTUGUITA|BOLA DE|PALOMITA|GRASA|MARUCHA|TAPA|PUCHERO|RUEDA|VACUN|NOVILLO|CARNE|LITORALE|MILANESA|HAMBURG|MEDALLON|CHINGOLITO|TOMAHAWK/.test(p)) return 'vac';
+  return 'alm';
+}
 function MC_compute(rows){
   var PARR=/^(ASADO|VACIO|TAPA DE ASADO|ENTRA[ÑN]A|CENTRO DE ENTRA[ÑN]A|MATAMBRE|COSTILLAR|FALDA|COLITA DE CUADRIL|PICA[ÑN]A|VACIO\/ ?TAPA CERDO|PECHITO DE CERDO|COSTILLA DE CERDO|BONDIOLA|MATAMBRE DE CERDO|CHULETAS|BIFE DE CHORIZO|OJO DE BIFE|AMERICANO)/;
   function groups(p){
@@ -28,12 +46,13 @@ function MC_compute(rows){
     if(!p || /NO USAR/.test(p)) return;
     var t=+r.total||0; if(t<=0) return;
     var f=r.fecha; var day=f.slice(0,10);
-    var k=o; if(!byOrder[k]) byOrder[k]={day:day,hour:+f.slice(11,13),t:0,prods:{},g:{}};
-    var B=byOrder[k]; B.t+=t; B.prods[p]=1; var gg=groups(p); for(var x in gg) B.g[x]=1; if(gg.propio) B.vp=(B.vp||0)+t;
+    var k=o; if(!byOrder[k]) byOrder[k]={day:day,hour:+f.slice(11,13),t:0,prods:{},g:{},fam:{},kv:0,kp:0,vp2:0,pp:{}};
+    var B=byOrder[k]; B.t+=t; B.prods[p]=1; var fm=MC_fam(p), q=+r.cant||0; B.fam[fm]=(B.fam[fm]||0)+t; if(fm==='vac') B.kv+=q; if(/^PICADA COMUN/.test(p)&&q>0){B.kp+=q;B.vp2+=t;var pu=String(Math.round(t/q/100)*100);B.pp[pu]=(B.pp[pu]||0)+q;} var gg=groups(p); for(var x in gg) B.g[x]=1; if(gg.propio) B.vp=(B.vp||0)+t;
   });
   var RULES=MC_RULES; var days={};
   Object.keys(byOrder).forEach(function(k){var B=byOrder[k]; if(B.t<=0) return;
-    var D=days[B.day]||(days[B.day]={fecha:B.day,tickets:0,venta:0,items:0,multi:0,prop:0,vprop:0,r:{}});
+    var D=days[B.day]||(days[B.day]={fecha:B.day,tickets:0,venta:0,items:0,multi:0,prop:0,vprop:0,r:{},fam:{},kvac:0,kpic:0,vpic:0,ppic:{}});
+    for(var fk in B.fam) D.fam[fk]=(D.fam[fk]||0)+B.fam[fk]; D.kvac+=B.kv; D.kpic+=B.kp; D.vpic+=B.vp2; for(var pk in B.pp) D.ppic[pk]=(D.ppic[pk]||0)+B.pp[pk];
     if(B.vp>0){D.prop++;D.vprop+=B.vp;}
     var n=Object.keys(B.prods).length; D.tickets++; D.venta+=B.t; D.items+=n; if(n>1) D.multi++;
     RULES.forEach(function(R){ var trig=R.trig.some(function(x){return B.g[x]||x==='*';}); if(!trig) return;
@@ -49,7 +68,7 @@ function MC_compute(rows){
     var D=days[k]||(days[k]={fecha:k,tickets:0,venta:0,items:0,multi:0,prop:0,vprop:0,r:{}});
     D.vt=Math.round(tot[k].vt); D.va=Math.round(tot[k].va);
   });
-  return Object.keys(days).sort().map(function(k){var D=days[k]; D.venta=Math.round(D.venta); D.vprop=Math.round(D.vprop); return D;});
+  return Object.keys(days).sort().map(function(k){var D=days[k]; D.venta=Math.round(D.venta); D.vprop=Math.round(D.vprop); if(D.fam){for(var fk in D.fam) D.fam[fk]=Math.round(D.fam[fk]); D.kvac=Math.round(D.kvac*10)/10; D.kpic=Math.round(D.kpic*10)/10; D.vpic=Math.round(D.vpic); for(var pk in D.ppic) D.ppic[pk]=Math.round(D.ppic[pk]*10)/10;} return D;});
 }
 var MC_RULES=[
   {id:'c1',corto:'Chorizo o morcilla con la parrilla',valor:8400,area:'Carnicería',trig:['parrilla'],offer:['embutido'],titulo:'Parrilla → chorizo o morcilla',
@@ -87,14 +106,14 @@ function MC_parse(XLSX, data){
   var A=XLSX.utils.sheet_to_json(ws,{header:1,raw:true});
   var h=A[0].map(function(x){return String(x||'').trim().toLowerCase();});
   function col(re){for(var i=0;i<h.length;i++) if(re.test(h[i])) return i; return -1;}
-  var cF=col(/^fecha/),cO=col(/^orden|referencia/),cP=col(/producto/),cC=col(/cliente/),cT=col(/^total/);
+  var cF=col(/^fecha/),cO=col(/^orden|referencia/),cP=col(/producto/),cC=col(/cliente/),cT=col(/^total/),cQ=col(/^cant/);
   if([cF,cO,cP,cT].some(function(i){return i<0;})) throw new Error('No encuentro las columnas Fecha de la orden, Orden, Variante del producto y Total.');
   function pad(n){return (n<10?'0':'')+n;}
   function fdate(v){ if(typeof v==='number'){var d=XLSX.SSF.parse_date_code(v); return d.y+'-'+pad(d.m)+'-'+pad(d.d)+' '+pad(d.H)+':'+pad(d.M);} 
     var s=String(v); var m=s.match(/(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3]+' '+m[4]+':'+m[5];
     m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/); if(m) return m[3]+'-'+pad(+m[2])+'-'+pad(+m[1])+' '+pad(+m[4])+':'+m[5]; return null; }
   var out=[]; for(var i=1;i<A.length;i++){var r=A[i]; if(!r||r[cF]==null) continue; var f=fdate(r[cF]); if(!f) continue;
-    out.push({fecha:f,orden:r[cO],producto:r[cP],cliente:cC>=0?r[cC]:'',total:typeof r[cT]==='number'?r[cT]:parseFloat(String(r[cT]).replace(/\./g,'').replace(',','.'))});}
+    out.push({fecha:f,orden:r[cO],producto:r[cP],cliente:cC>=0?r[cC]:'',cant:cQ>=0?(typeof r[cQ]==='number'?r[cQ]:parseFloat(String(r[cQ]).replace(/\./g,'').replace(',','.'))||0):0,total:typeof r[cT]==='number'?r[cT]:parseFloat(String(r[cT]).replace(/\./g,'').replace(',','.'))});}
   return out;
 }
-if(typeof module!=='undefined') module.exports={MC_parse:MC_parse};
+if(typeof module!=='undefined') module.exports={MC_RULES:MC_RULES,MC_parse:MC_parse,MC_compute:MC_compute,MC_fam:MC_fam,MC_FAMS:MC_FAMS};

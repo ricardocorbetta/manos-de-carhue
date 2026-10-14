@@ -1,6 +1,7 @@
 import { q } from './_lib/db.js';
 import { json, soloMetodo } from './_lib/http.js';
 import { exigir } from './_lib/auth.js';
+import { conDefaults } from './_lib/defaults.js';
 
 // Devuelve todo lo que el tablero necesita para el cliente de la sesión.
 export default async function handler(req, res) {
@@ -14,13 +15,15 @@ export default async function handler(req, res) {
     ]);
     const C = {}; let actualizado = null;
     conf.forEach(r => { C[r.clave] = r.data; if (!actualizado || r.actualizado > actualizado) actualizado = r.actualizado; });
+    let metas = C.metas ? conDefaults(s.cliente, C.metas) : null;
     let plan = C.plan || {};
     if (s.rol === 'equipo') { // el equipo no ve las acciones del encargado
       const p2 = {}; Object.keys(plan).forEach(k => { p2[k] = { dias: (plan[k] || {}).dias || {} }; }); plan = p2;
+      if (metas) { metas = { ...metas }; delete metas.mix; } // márgenes y gastos fijos: solo encargado
     }
     return json(res, 200, {
       cliente: cli[0], rol: s.rol, usuario: s.usuario,
-      metas: C.metas || null, notas: C.notas || {}, plan,
+      metas, notas: C.notas || {}, plan,
       dias: dias.map(r => r.data), actualizado
     });
   } catch (e) { console.error(e); return json(res, 500, { error: 'No se pudieron leer los datos.' }); }

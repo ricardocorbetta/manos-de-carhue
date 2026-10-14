@@ -39,7 +39,7 @@ function mesFechas(){var t=hoy();var y=+t.slice(0,4),m=+t.slice(5,7);var n=new D
 function periodoFechas(){
   if(VIEW.periodo==='semana') return semana(VIEW.wk);
   if(VIEW.periodo==='hoy'||VIEW.periodo==='plan') return semana(0);
-  if(VIEW.periodo==='mes') return mesFechas();
+  if(VIEW.periodo==='mes'||VIEW.periodo==='mix') return mesFechas();
   var ds=diasPOS(); return ds.length?[ds[ds.length-1].fecha]:[];
 }
 // aggregate over a list of dates: real only on days with data; meta for those same days
@@ -106,7 +106,7 @@ function tituloPeriodo(fs){
   if(VIEW.periodo==='plan'){var l0=lunesDe(hoy());return 'Plan desde la '+semNom(l0)+' ('+fcorta(l0)+') hasta el '+fcorta(addDays(l0,27));}
   if(VIEW.periodo==='hoy'){var tt=hoy(),l=lunesDe(tt);return DIAS[wd(tt)]+' '+fcorta(tt)+' · '+semNom(l)+', día '+(Math.round((D(tt)-D(l))/864e5)+1)+' de 7';}
   if(VIEW.periodo==='semana'){var r=semLabel(fs[0]);return VIEW.wk===0?r+' (en curso)':r;}
-  if(VIEW.periodo==='mes'){return 'Mes de '+MESES[+fs[0].slice(5,7)-1]+(fs[0].slice(8)!=='01'?' (desde el '+fcorta(fs[0])+')':'');}
+  if(VIEW.periodo==='mes'||VIEW.periodo==='mix'){return 'Mes de '+MESES[+fs[0].slice(5,7)-1]+(fs[0].slice(8)!=='01'?' (desde el '+fcorta(fs[0])+')':'');}
   return fs.length?DIAS[wd(fs[0])]+' '+fcorta(fs[0]):'Sin datos';
 }
 
@@ -225,8 +225,7 @@ function confeti(){
 function mesClave(){return hoy().slice(0,7);}
 function mesNombre(){return MESES[+hoy().slice(5,7)-1];}
 // Objetivo inicial por cliente, hasta que el encargado lo guarde desde el formulario.
-var MES_INICIAL={'manos-carhue':{'2026-10':157000000}};
-function mesObjetivo(){var m=STATE.metas.mes||MES_INICIAL[(STATE.cliente||{}).id]||{};var v=+m[mesClave()];return v>0?v:0;}
+function mesObjetivo(){var m=STATE.metas.mes||{};var v=+m[mesClave()];return v>0?v:0;}
 function mesTodas(){var t=hoy(),y=+t.slice(0,4),m=+t.slice(5,7),n=new Date(y,m,0).getDate(),ds=[];for(var i=1;i<=n;i++)ds.push(y+'-'+pad(m)+'-'+pad(i));return ds;}
 // peso de cada día dentro del mes: lo que se espera vender según las metas de ese día de la semana (0 = cerrado)
 function pesoDia(f){var e=STATE.metas.especiales[f];return (+(e!=null?e:STATE.metas.tkDia[wd(f)])||0)*tkMeta(f);}
@@ -271,6 +270,104 @@ function mesEquipo(){
     '<div class="bar tall" aria-hidden="true"><i class="anim-bar fill-'+(s||'warn')+'" data-w="'+pct.toFixed(1)+'" style="width:'+pct.toFixed(1)+'%"></i>'+(c.pC?'<b style="left:'+Math.min(c.marca,100).toFixed(1)+'%"></b>':'')+'</div>'+
     '<div class="eq-objmsg">'+msg+(c.diasRest?' Quedan '+c.diasRest+' días del mes, hoy incluido.':'')+'</div>'+
     (c.pC?'<div class="m">La rayita negra marca dónde tendríamos que estar hoy.</div>':'')+'</section>';
+}
+
+// ---- mix y margen (solo encargado: los márgenes llegan del servidor y no se mandan al equipo) ----
+function mixCfg(){return (STATE&&STATE.metas&&STATE.metas.mix)||null;}
+function famNom(k){for(var i=0;i<MC_FAMS.length;i++) if(MC_FAMS[i][0]===k) return MC_FAMS[i][1]; return k;}
+function mixObj(key){var M=mixCfg();return ((M.objetivos||{})[key||mesClave()])||M.base;}
+function mixPic(key){var M=mixCfg();return ((M.picada||{})[key||mesClave()])||{precio:0,maxPct:100};}
+function vacMargen(m,up,extra){return (1-(1-m/100)/(1+(up||0)/100))*100+(+extra||0);}
+function margenMix(sh,mg,vacUp,vacExtra){var w=0,T=0;MC_FAMS.forEach(function(f){var k=f[0],x=+sh[k]||0,m=+mg[k]||0;if(k==='vac') m=vacMargen(m,vacUp,vacExtra);w+=x*m;T+=x;});return T?w/T:0;}
+function mixCalc(){
+  var all={}; STATE.dias.forEach(function(d){all[d.fecha]=d;});
+  var c={fam:{},tot:0,dias:0,sin:0,kvac:0,kpic:0,vpic:0,ppic:{},sh:{}};
+  mesTodas().forEach(function(f){var d=all[f]; if(!d||!d.tickets) return; if(!d.fam){c.sin++;return;} c.dias++;
+    for(var k in d.fam){c.fam[k]=(c.fam[k]||0)+d.fam[k];c.tot+=d.fam[k];} c.kvac+=d.kvac||0;c.kpic+=d.kpic||0;c.vpic+=d.vpic||0;
+    for(var p in (d.ppic||{})) c.ppic[p]=(c.ppic[p]||0)+d.ppic[p];});
+  MC_FAMS.forEach(function(f){c.sh[f[0]]=c.tot?(c.fam[f[0]]||0)/c.tot*100:null;});
+  return c;
+}
+function pctf(v,d){return v==null?'–':nf(v,d==null?1:d)+'%';}
+function mixSection(){
+  var M=mixCfg(); if(!M) return '';
+  var c=mixCalc(), O=mixObj(), P=mixPic(), mes=mesNombre(), h='';
+  var mBase=margenMix(M.base,M.margenes,0), mObj=margenMix(O,M.margenes,0), mReal=c.tot?margenMix(c.sh,M.margenes,0):null;
+  // 1. mix real vs objetivo
+  h+='<section class="card"><div class="colhead"><h2>Mix de '+mes+'</h2><span class="sub">parte de la venta del mostrador por familia · '+(c.dias?c.dias+' día'+(c.dias>1?'s':'')+' cargado'+(c.dias>1?'s':''):'sin días cargados')+'</span></div>'+
+     '<div class="proygrid">'+
+       '<div><span class="l">Margen con el mix del mes</span><strong>'+pctf(mReal)+'</strong>'+(mReal!=null?pill(estado(mReal,mObj)):'')+'</div>'+
+       '<div><span class="l">Margen con el mix objetivo</span><strong>'+pctf(mObj)+'</strong><span class="m">junio a septiembre: '+pctf(mBase)+'</span></div>'+
+       '<div><span class="l">Vacuno en la venta</span><strong>'+pctf(c.sh.vac)+'</strong><span class="m">objetivo: '+pctf(O.vac)+' o menos</span></div>'+
+     '</div>'+
+     (c.sin?'<div class="stale">Hay '+c.sin+' día'+(c.sin>1?'s':'')+' del mes cargado'+(c.sin>1?'s':'')+' antes de esta versión. Volvé a subir el Excel del mes para verlos en el mix.</div>':'')+
+     '<div class="tbl"><table><thead><tr><th>Familia</th><th>Jun–sep</th><th>Objetivo</th><th>Real del mes</th><th>Diferencia</th><th>Estado</th><th>Margen de la familia</th></tr></thead><tbody>'+
+     MC_FAMS.map(function(f){var k=f[0],r=c.sh[k],o=+O[k],dif=r==null?null:r-o,s=null;
+       if(r!=null){ if(k==='vac') s=r<=o?'good':(r<=o+2?'warn':'bad'); else s=r>=o?'good':(r>=o*0.9?'warn':'bad'); }
+       return '<tr><td>'+esc(f[1])+'</td><td>'+pctf(+M.base[k])+'</td><td><b>'+pctf(o)+'</b></td><td>'+pctf(r)+'</td><td>'+(dif==null?'–':sg(dif,1,' pts'))+'</td><td>'+pill(s)+'</td><td>'+pctf(+M.margenes[k])+'</td></tr>';}).join('')+
+     '</tbody></table></div>'+
+     '<div class="m">Vacuno deja '+pctf(+M.margenes.vac)+' y cerdo, pollo y achuras entre '+pctf(Math.min(+M.margenes.pol,+M.margenes.cer))+' y '+pctf(+M.margenes.ach)+': cada punto de venta que pasa de vacuno a esas familias sube el margen. El margen de cada familia sale de comparar compras contra ventas de junio a septiembre.</div></section>';
+  // 2. picada común
+  var pp=Object.keys(c.ppic).map(function(k){return [+k,c.ppic[k]];}).sort(function(a,b){return b[1]-a[1];});
+  var pctPic=c.kvac?c.kpic/c.kvac*100:null, prPic=c.kpic?c.vpic/c.kpic:null, bajo=pp.filter(function(x){return x[0]<P.precio;}).reduce(function(a,x){return a+x[1];},0);
+  h+='<section class="card"><div class="colhead"><h2>Picada común</h2><span class="sub">se hace con retazo: cuanto menos retazo, más carne se vende como corte</span></div>'+
+     '<div class="proygrid">'+
+       '<div><span class="l">Kilos de picada sobre el vacuno</span><strong>'+pctf(pctPic)+'</strong>'+(pctPic!=null?pill(pctPic<=P.maxPct?'good':(pctPic<=P.maxPct+3?'warn':'bad')):'')+'<span class="m">objetivo: '+pctf(+P.maxPct,0)+' o menos · '+nf(c.kpic)+' kg de '+nf(c.kvac)+' kg</span></div>'+
+       '<div><span class="l">Precio promedio por kilo (con IVA)</span><strong>'+(prPic?'$'+nf(prPic):'–')+'</strong>'+(prPic?pill(estado(prPic,+P.precio)):'')+'<span class="m">objetivo: $'+nf(+P.precio)+'</span></div>'+
+       '<div><span class="l">Kilos cobrados por debajo del objetivo</span><strong>'+(c.kpic?nf(bajo)+' kg':'–')+'</strong><span class="m">'+(c.kpic?pctf(bajo/c.kpic*100,0)+' de la picada':'')+'</span></div>'+
+     '</div>'+
+     (pp.length?'<div class="m">Kilos por precio: '+pp.slice(0,6).map(function(x){return '<b>$'+nf(x[0])+'</b> '+nf(x[1])+' kg';}).join(' · ')+'</div>':'')+
+     '<div class="m">Para bajar el retazo: pesar lo que va a la picadora y anotar de qué pieza sale; ofrecer los cortes que no salen como promoción del día antes de molerlos.</div></section>';
+  // 3. simulador
+  var S=VIEW.sim; if(!S||S.mes!==mesClave()){S=VIEW.sim={mes:mesClave(),src:'obj-'+mesClave(),sh:Object.assign({},O),ventas:Math.round((mesObjetivo()||157e6)/(+M.factorOdoo||1.165)/1e6),fijos:Math.round(+M.fijos/1e6),vacUp:+((M.precioVac||{})[mesClave()]||0),vacExtra:+((M.mejoraVac||{})[mesClave()]||0)};}
+  var sh=S.sh, other=MC_FAMS.slice(1).reduce(function(a,f){return a+(+sh[f[0]]||0);},0); sh.vac=Math.max(0,100-other);
+  var mg=margenMix(sh,M.margenes,S.vacUp,S.vacExtra), ub=S.ventas*mg/100, res=ub-S.fijos, eq=mg>0?S.fijos/(mg/100):NaN, k=+M.factorOdoo||1.165;
+  var vacM=vacMargen(+M.margenes.vac,S.vacUp,S.vacExtra);
+  var srcs=[['base','Jun–sep',M.base]].concat(c.tot?[['real','Real del mes',c.sh]]:[]).concat(Object.keys(M.objetivos||{}).sort().map(function(key){return ['obj-'+key,'Objetivo de '+MESES[+key.slice(5,7)-1],M.objetivos[key]];}));
+  h+='<section class="card" id="sim"><div class="colhead"><h2>Escenarios de mix</h2><span class="sub">probá combinaciones de mix, precio del vacuno y ventas · no se guarda</span></div>'+
+     '<div class="pills" role="group" aria-label="Partir de">'+srcs.map(function(x){return '<button type="button" class="simsrc" data-s="'+x[0]+'" aria-pressed="'+(S.src===x[0])+'">'+esc(x[1])+'</button>';}).join('')+'</div>'+
+     '<div class="fields"><label for="sim-v">Ventas netas del mes (millones, sin IVA)<input id="sim-v" type="number" min="0" step="1" value="'+S.ventas+'"></label>'+
+       '<label for="sim-f">Gastos fijos (millones)<input id="sim-f" type="number" min="0" step="1" value="'+S.fijos+'"></label>'+
+       '<label for="sim-p">Aumento de precio del vacuno (%)<input id="sim-p" type="number" min="-20" max="50" step="1" value="'+S.vacUp+'"></label>'+
+       '<label for="sim-x">Mejora del vacuno por menos retazo y control de kilos (puntos de margen)<input id="sim-x" type="number" min="0" max="30" step="0.5" value="'+S.vacExtra+'"></label></div>'+
+     '<div class="proygrid">'+
+       '<div><span class="l">Margen bruto</span><strong>'+pctf(mg)+'</strong><span class="m">vacuno: '+pctf(vacM)+'</span></div>'+
+       '<div><span class="l">Utilidad bruta</span><strong>'+money(ub*1e6)+'</strong><span class="m">en Odoo se vende '+money(S.ventas*k*1e6)+'</span></div>'+
+       '<div><span class="l">Resultado después de fijos</span><strong>'+(res>=0?'+':'')+money(res*1e6)+'</strong>'+pill(res>=0?'good':(res>=-3?'warn':'bad'))+'</div>'+
+       '<div><span class="l">Ventas para equilibrio</span><strong>'+(isFinite(eq)?money(eq*1e6):'–')+'</strong><span class="m">netas · '+(isFinite(eq)?money(eq*k*1e6)+' en Odoo':'')+'</span></div>'+
+     '</div>'+
+     '<div class="tbl"><table class="pt"><thead><tr><th>Familia</th><th>Participación</th><th>Margen</th><th>Aporte</th></tr></thead><tbody>'+
+     MC_FAMS.map(function(f,i){var kk=f[0],m=kk==='vac'?vacM:+M.margenes[kk];return '<tr><td>'+esc(f[1])+'</td><td>'+(i===0?'<b>'+nf(sh.vac,1)+'%</b> <span class="m">se ajusta solo</span>':'<input type="number" class="simsh" data-k="'+kk+'" id="simsh-'+kk+'" min="0" max="100" step="0.1" value="'+(Math.round((+sh[kk]||0)*10)/10)+'" aria-label="Participación '+esc(f[1])+'">%')+'</td><td>'+pctf(m)+'</td><td>'+nf(sh[kk]*m/100,2)+' pts</td></tr>';}).join('')+
+     '</tbody></table></div><div class="m">Cada familia que sube le saca participación al vacuno. Margen bruto = suma de participación × margen de cada familia. Ventas para equilibrio = gastos fijos ÷ margen. La prueba de desposte muestra que el vacuno puede dejar alrededor de 25% si baja el retazo y no se pierden kilos: cada punto de mejora del vacuno suma cerca de medio punto al margen total.</div></section>';
+  return h;
+}
+function bindMix(){
+  if(VIEW.periodo!=='mix'||!mixCfg()) return; var M=mixCfg(), c=null;
+  document.querySelectorAll('.simsrc').forEach(function(b){b.onclick=function(){var s=b.dataset.s,src=s==='base'?M.base:(s==='real'?(c=c||mixCalc()).sh:M.objetivos[s.slice(4)]);VIEW.sim.src=s;VIEW.sim.sh=Object.assign({},src);if(s==='base'){VIEW.sim.vacUp=0;VIEW.sim.vacExtra=0;}else if(s.indexOf('obj-')===0){var kk=s.slice(4);VIEW.sim.vacUp=+((M.precioVac||{})[kk]||0);VIEW.sim.vacExtra=+((M.mejoraVac||{})[kk]||0);}VIEW.adminOpen=$('#adm').open;render();};});
+  document.querySelectorAll('.simsh').forEach(function(i){i.onchange=function(){VIEW.sim.sh[i.dataset.k]=Math.max(0,+i.value||0);VIEW.sim.src=null;VIEW.adminOpen=$('#adm').open;render();};});
+  [['#sim-v','ventas'],['#sim-f','fijos'],['#sim-p','vacUp'],['#sim-x','vacExtra']].forEach(function(x){var el=$(x[0]);if(el) el.onchange=function(){VIEW.sim[x[1]]=+el.value||0;VIEW.adminOpen=$('#adm').open;render();};});
+}
+function mixAdmin(){
+  var M=mixCfg(); if(!M) return ''; var key=mesClave(), O=mixObj(key), P=mixPic(key);
+  return '<div class="note"><b>4. Mix de '+mesNombre()+' y márgenes</b><span>Objetivo de participación de cada familia en la venta del mostrador (vacuno se calcula solo), metas de la picada común y margen de cada familia. Solo lo ve el encargado.</span></div>'+
+    '<div class="fields">'+MC_FAMS.slice(1).map(function(f){return '<label for="mo-'+f[0]+'">Objetivo '+esc(f[1])+' (%)<input id="mo-'+f[0]+'" type="number" min="0" max="100" step="0.1" value="'+esc(+O[f[0]])+'"></label>';}).join('')+
+    '<label for="mp-precio">Precio objetivo de la picada común ($/kg con IVA)<input id="mp-precio" type="number" min="0" step="100" value="'+esc(+P.precio||'')+'"></label>'+
+    '<label for="mp-max">Picada común: máximo de kilos sobre el vacuno (%)<input id="mp-max" type="number" min="0" max="100" step="1" value="'+esc(+P.maxPct||'')+'"></label>'+
+    '<label for="mp-vac">Aumento de precio del vacuno previsto (%)<input id="mp-vac" type="number" min="-20" max="50" step="1" value="'+esc(+((M.precioVac||{})[key]||0))+'"></label>'+
+    '<label for="mp-x">Mejora prevista del vacuno por retazo y control de kilos (puntos)<input id="mp-x" type="number" min="0" max="30" step="0.5" value="'+esc(+((M.mejoraVac||{})[key]||0))+'"></label>'+
+    '<label for="mp-fijos">Gastos fijos por mes (millones)<input id="mp-fijos" type="number" min="0" step="1" value="'+esc(Math.round(+M.fijos/1e6))+'"></label></div>'+
+    '<div class="fields">'+MC_FAMS.map(function(f){return '<label for="mg-'+f[0]+'">Margen '+esc(f[1])+' (%)<input id="mg-'+f[0]+'" type="number" min="-50" max="100" step="0.1" value="'+esc(+M.margenes[f[0]])+'"></label>';}).join('')+'</div>';
+}
+function readMix(){
+  var M=mixCfg(); if(!M||!$('#mp-precio')) return; var key=mesClave();
+  var o={}, other=0; MC_FAMS.slice(1).forEach(function(f){var v=+$('#mo-'+f[0]).value;o[f[0]]=v>=0?v:0;other+=o[f[0]];}); o.vac=Math.max(0,Math.round((100-other)*10)/10);
+  M.objetivos=M.objetivos||{}; M.objetivos[key]=o;
+  M.picada=M.picada||{}; M.picada[key]={precio:+$('#mp-precio').value||0,maxPct:+$('#mp-max').value||0};
+  M.precioVac=M.precioVac||{}; M.precioVac[key]=+$('#mp-vac').value||0;
+  M.mejoraVac=M.mejoraVac||{}; M.mejoraVac[key]=+$('#mp-x').value||0;
+  var fj=+$('#mp-fijos').value; if(fj>0) M.fijos=Math.round(fj*1e6);
+  MC_FAMS.forEach(function(f){var v=parseFloat($('#mg-'+f[0]).value); if(isFinite(v)) M.margenes[f[0]]=v;});
+  VIEW.sim=null;
 }
 
 function objetivoEquipo(){
@@ -403,11 +500,12 @@ function render(){
   var h='';
   // freshness
   var ayer=addDays(t,-1), falta1=last?addDays(last,1):null; while(falta1&&falta1<=ayer&&cerrado(falta1)) falta1=addDays(falta1,1); var atras=falta1&&falta1<=ayer;
-  h+=marca()+'<header class="top"><div><div class="eyebrow">'+(MARCAS[cid()]?'Tablero del equipo':'Manos de Carhué · Tablero del equipo')+'</div><h1>'+(VIEW.periodo==='hoy'?'Arranque del día':(VIEW.periodo==='plan'?'Plan de acción':'¿Cómo venimos?'))+'</h1><div class="sub">Vista del encargado</div>'+previewBanner()+''+
+  h+=marca()+'<header class="top"><div><div class="eyebrow">'+(MARCAS[cid()]?'Tablero del equipo':'Manos de Carhué · Tablero del equipo')+'</div><h1>'+(VIEW.periodo==='hoy'?'Arranque del día':(VIEW.periodo==='plan'?'Plan de acción':(VIEW.periodo==='mix'?'Mix y margen':'¿Cómo venimos?')))+'</h1><div class="sub">Vista del encargado</div>'+previewBanner()+''+
      '<div class="sub">'+esc(tituloPeriodo(fs))+' · Datos de Odoo hasta el '+(last?DIAS[wd(last)].toLowerCase()+' '+fcorta(last):'–')+'</div>'+
      (atras?'<div class="stale">Faltan cargar las ventas desde el '+fcorta(falta1)+'.</div>':'')+'</div>'+
-     '<div class="hdr-r">'+modoSwitch()+'<div class="pills" role="group" aria-label="Período">'+[['hoy','Hoy'],['semana','Semana'],['mes','Mes'],['plan','Plan 4 semanas']].map(function(p){return '<button type="button" data-p="'+p[0]+'" aria-pressed="'+(VIEW.periodo===p[0])+'">'+p[1]+'</button>';}).join('')+'</div></div></header>';
+     '<div class="hdr-r">'+modoSwitch()+'<div class="pills" role="group" aria-label="Período">'+[['hoy','Hoy'],['semana','Semana'],['mes','Mes'],['plan','Plan 4 semanas']].concat(mixCfg()?[['mix','Mix']]:[]).map(function(p){return '<button type="button" data-p="'+p[0]+'" aria-pressed="'+(VIEW.periodo===p[0])+'">'+p[1]+'</button>';}).join('')+'</div></div></header>';
 
+  if(VIEW.periodo==='mix'){ h+=mixSection(); } else {
   if(VIEW.periodo==='hoy'||VIEW.periodo==='mes') h+=mesEncargado();
   if(VIEW.periodo==='hoy') h+=huddle()+proximos7();
   if(VIEW.periodo!=='plan'){
@@ -468,6 +566,8 @@ function render(){
      '<div class="legend"><span><i class="sw fill-good"></i>En meta</span><span><i class="sw fill-warn"></i>Hasta 5% debajo</span><span><i class="sw fill-bad"></i>Más de 5% debajo</span><span><i class="sw" style="background:var(--meta);height:3px"></i>Meta del día</span></div></section>';
   }
 
+  } // fin de las vistas que no son Mix
+
   // admin
   var espTxt=Object.keys(M.especiales).sort().map(function(k){return k.split('-').reverse().join('/')+' = '+M.especiales[k];}).join('\n');
   h+='<details class="admin" id="adm"'+(VIEW.adminOpen?' open':'')+'><summary>Cargar ventas del día y metas (Joaquín)</summary><div class="grid">'+
@@ -485,6 +585,7 @@ function render(){
     '<label for="ob-cli">Clientes del período<input id="ob-cli" type="number" min="0" placeholder="'+nf(agg(objFechas()).metaTotal)+'" value="'+esc((M.objetivo||{}).clientes||'')+'"></label>'+
     '<label for="ob-txt" class="wide">Título que ve el equipo<input id="ob-txt" type="text" placeholder="Objetivo de la semana" value="'+esc((M.objetivo||{}).texto||'')+'"></label>'+
     '<label for="ob-mes" class="wide">Objetivo de ventas de '+mesNombre()+', en millones de $ (todas las ventas de Odoo)<input id="ob-mes" type="number" min="0" step="0.1" placeholder="sin objetivo" value="'+(mesObjetivo()?esc(mesObjetivo()/1e6):'')+'"></label></div>'+
+    mixAdmin()+
     '<label class="fields1" for="mt-esp">Metas especiales por fecha (una por línea, dd/mm/aaaa = clientes)<textarea id="mt-esp" rows="3">'+esc(espTxt)+'</textarea></label>'+
     '<div><button class="btn" id="b-save" type="button">Guardar para el equipo</button></div><div class="msg" id="m-save"></div></div></details>';
   h+='<footer class="note"><span>Clientes, ticket y venta cruzada cuentan solo las ventas del punto de venta: no incluyen pedidos de la Municipalidad, Cabaña Tres Marías ni consumos internos.</span>'+
@@ -496,7 +597,7 @@ function render(){
   bindModo();
   document.querySelectorAll('.pills button').forEach(function(b){b.onclick=function(){VIEW.periodo=b.dataset.p;VIEW.adminOpen=$('#adm').open;render();};});
   document.querySelectorAll('.nb').forEach(function(b){b.onclick=function(){var w=+b.dataset.w;VIEW.wk=w===0?0:VIEW.wk+w;VIEW.adminOpen=$('#adm').open;render();};});
-  $('#f-xlsx').onchange=onFile; $('#b-save').onclick=function(){onSave('b-save','m-save');}; bindPlan(); bind7();
+  $('#f-xlsx').onchange=onFile; $('#b-save').onclick=function(){onSave('b-save','m-save');}; bindPlan(); bind7(); bindMix();
   $('#adm').ontoggle=function(){VIEW.adminOpen=this.open;};
   if(VIEW.msgX){$('#m-xlsx').className='msg '+(VIEW.msgX[0]||'');$('#m-xlsx').textContent=VIEW.msgX[1];}
   drawChart();
@@ -546,6 +647,7 @@ function readMetas(){
   MC_RULES.forEach(function(R){var v=+$('#r-'+R.id).value; if(v>0&&v<=100) M.rules[R.id]=v;});
   M.objetivo={periodo:$('#ob-per').value,clientes:(+$('#ob-cli').value>0?+$('#ob-cli').value:null),texto:$('#ob-txt').value.trim()};
   M.mes=M.mes||{}; var vm=+$('#ob-mes').value; if(vm>0) M.mes[mesClave()]=Math.round(vm*1e6); else delete M.mes[mesClave()];
+  readMix();
   var esp={}; $('#mt-esp').value.split('\n').forEach(function(l){var m2=l.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s*=\s*(\d+)/); if(m2) esp[m2[3]+'-'+pad(+m2[2])+'-'+pad(+m2[1])]=+m2[4];}); M.especiales=esp;
 }
 // ---- servidor ----
