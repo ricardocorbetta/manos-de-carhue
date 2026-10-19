@@ -587,7 +587,8 @@ function render(){
     '<label for="ob-mes" class="wide">Objetivo de ventas de '+mesNombre()+', en millones de $ (todas las ventas de Odoo)<input id="ob-mes" type="number" min="0" step="0.1" placeholder="sin objetivo" value="'+(mesObjetivo()?esc(mesObjetivo()/1e6):'')+'"></label></div>'+
     mixAdmin()+
     '<label class="fields1" for="mt-esp">Metas especiales por fecha (una por línea, dd/mm/aaaa = clientes)<textarea id="mt-esp" rows="3">'+esc(espTxt)+'</textarea></label>'+
-    '<div><button class="btn" id="b-save" type="button">Guardar para el equipo</button></div><div class="msg" id="m-save"></div></div></details>';
+    '<div><button class="btn" id="b-save" type="button">Guardar para el equipo</button></div><div class="msg" id="m-save"></div>'+
+    usuariosAdmin()+'</div></details>';
   h+='<footer class="note"><span>Clientes, ticket y venta cruzada cuentan solo las ventas del punto de venta: no incluyen pedidos de la Municipalidad, Cabaña Tres Marías ni consumos internos.</span>'+
      '<span>El objetivo de ventas del mes cuenta todo lo que trae el reporte de Odoo: mostrador, pedidos, organizaciones y Aberasturi.</span>'+
      '<span>"Si seguimos a este ritmo" aplica el cumplimiento de los días cargados a la meta de los días que faltan.</span>'+
@@ -597,7 +598,7 @@ function render(){
   bindModo();
   document.querySelectorAll('.pills button').forEach(function(b){b.onclick=function(){VIEW.periodo=b.dataset.p;VIEW.adminOpen=$('#adm').open;render();};});
   document.querySelectorAll('.nb').forEach(function(b){b.onclick=function(){var w=+b.dataset.w;VIEW.wk=w===0?0:VIEW.wk+w;VIEW.adminOpen=$('#adm').open;render();};});
-  $('#f-xlsx').onchange=onFile; $('#b-save').onclick=function(){onSave('b-save','m-save');}; bindPlan(); bind7(); bindMix();
+  $('#f-xlsx').onchange=onFile; $('#b-save').onclick=function(){onSave('b-save','m-save');}; bindPlan(); bind7(); bindMix(); bindUsuarios();
   $('#adm').ontoggle=function(){VIEW.adminOpen=this.open;};
   if(VIEW.msgX){$('#m-xlsx').className='msg '+(VIEW.msgX[0]||'');$('#m-xlsx').textContent=VIEW.msgX[1];}
   drawChart();
@@ -640,6 +641,36 @@ function onFile(ev){
   }; rd.readAsArrayBuffer(f);
 }
 
+// ---- usuarios y contraseñas (encargado) ----
+function usuariosAdmin(){
+  var L=VIEW.usuarios, ops=(L||[]).filter(function(u){return u.rol==='equipo'||u.usuario===SES.usuario||SES.rol==='admin';});
+  var lista=L?(L.length?L.map(function(u){return '<span><b>'+esc(u.usuario)+'</b> · '+esc(u.rol)+(u.ultimo_ingreso?' · último ingreso '+fcorta(String(u.ultimo_ingreso).slice(0,10)):' · nunca ingresó')+'</span>';}).join(''):'<span>No hay usuarios.</span>'):'<span>Cargando usuarios…</span>';
+  return '<div class="note"><b>5. Usuarios y contraseñas</b><span>Cambiá la contraseña del usuario del equipo o la tuya. Para un usuario nuevo del equipo, elegí "Usuario nuevo" y escribí el nombre.</span>'+lista+'</div>'+
+    '<div class="fields"><label for="us-sel">Usuario<select id="us-sel">'+ops.map(function(u){return '<option value="'+esc(u.usuario)+'">'+esc(u.usuario)+'</option>';}).join('')+'<option value="">Usuario nuevo del equipo…</option></select></label>'+
+    '<label for="us-nuevo">Nombre del usuario nuevo<input id="us-nuevo" type="text" autocapitalize="none" spellcheck="false" placeholder="ej. equipo.local"></label>'+
+    '<label for="us-clave">Contraseña nueva (8 o más caracteres)<input id="us-clave" type="text" autocomplete="new-password" spellcheck="false"></label>'+
+    '<div><button class="btn sec" id="us-gen" type="button">Generar una</button></div></div>'+
+    '<div><button class="btn" id="us-save" type="button">Guardar contraseña</button></div><div class="msg" id="us-m" role="status"></div>';
+}
+function cargarUsuarios(){
+  if(!SES||SES.rol==='equipo') return;
+  api('/api/usuarios').then(function(j){VIEW.usuarios=j.usuarios||[];var a=$('#adm');VIEW.adminOpen=a?a.open:VIEW.adminOpen;render();}).catch(function(){VIEW.usuarios=[];});
+}
+function bindUsuarios(){
+  var b=$('#us-save'); if(!b) return;
+  if(!VIEW.usuarios&&!VIEW._usCargando){VIEW._usCargando=true;cargarUsuarios();}
+  $('#us-gen').onclick=function(){var a='abcdefghjkmnpqrstuvwxyz23456789',c=new Uint32Array(8),s='';crypto.getRandomValues(c);for(var i=0;i<8;i++){s+=a[c[i]%a.length];if(i===3)s+='-';}$('#us-clave').value='Carhue-'+s;};
+  b.onclick=function(){
+    var u=$('#us-sel').value||$('#us-nuevo').value.trim().toLowerCase(), c=$('#us-clave').value, m=$('#us-m');
+    if(!u){m.className='msg err';m.textContent='Elegí un usuario o escribí el nombre del nuevo.';return;}
+    if(c.length<8){m.className='msg err';m.textContent='La contraseña tiene que tener al menos 8 caracteres.';return;}
+    b.disabled=true; m.className='msg'; m.textContent='Guardando…';
+    api('/api/usuarios',{method:'POST',body:{usuario:u,clave:c}}).then(function(j){
+      b.disabled=false; m.className='msg ok'; m.textContent=(j.creado?'Usuario '+j.usuario+' creado':'Contraseña de '+j.usuario+' cambiada')+'. Anotala ahora: no se vuelve a mostrar.';
+      if(j.creado){VIEW.usuarios=null;VIEW._usCargando=false;}
+    }).catch(function(e){b.disabled=false;if(e.status===401) return pantallaLogin('Tu sesión venció. Volvé a ingresar.');m.className='msg err';m.textContent=e.message||'No se pudo guardar.';});
+  };
+}
 function readMetas(){
   var M=STATE.metas; [0,1,2,3,4,5,6].forEach(function(i){var v=+$('#tk'+i).value;if(v>0)M.tkDia[i]=v;});
   M.itemsDia=M.itemsDia||{}; M.caseroDia=M.caseroDia||{}; [0,1,2,3,4,5,6].forEach(function(i){var a=+$('#it'+i).value;if(a>0)M.itemsDia[i]=a;var b=+$('#ca'+i).value;if(b>0&&b<=100)M.caseroDia[i]=b;});
