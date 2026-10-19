@@ -10,7 +10,7 @@ create table if not exists usuarios (
   usuario text not null unique,
   nombre text,
   pass_hash text not null,
-  rol text not null check (rol in ('admin','encargado','equipo')),
+  rol text not null check (rol in ('admin','encargado','equipo','lectura')),
   activo boolean not null default true,
   creado timestamptz not null default now(),
   ultimo_ingreso timestamptz

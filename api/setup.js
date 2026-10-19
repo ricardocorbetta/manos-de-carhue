@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     const hechos = [];
     for (const u of (b.usuarios || [])) {
       const usuario = String(u.usuario || '').trim().toLowerCase();
-      if (!usuario || !['admin', 'encargado', 'equipo'].includes(u.rol)) continue;
+      if (!usuario || !['admin', 'encargado', 'equipo', 'lectura'].includes(u.rol)) continue;
       if (!u.clave || String(u.clave).length < 8) return json(res, 400, { error: `La contraseña de ${usuario} tiene que tener al menos 8 caracteres.` });
       const hash = await bcrypt.hash(String(u.clave), 10);
       const ex = await q('select cliente_id from usuarios where usuario=$1', [usuario]);

@@ -25,3 +25,17 @@ await p.selectOption('#us-sel', ''); await p.fill('#us-nuevo', 'equipo.ventas');
 console.log('msg2:', await p.textContent('#us-m'));
 const nl = await post('/api/login', { usuario: 'equipo.ventas', clave: 'Carhue-abcd-efgh' }); console.log('nuevo login:', nl.r.status, nl.j.rol);
 await b.close();
+// Usuario de solo lectura
+x = await post('/api/login', { usuario: 'joaquin', clave: 'Prueba12345' }); ck = x.r.headers.get('set-cookie').split(';')[0];
+console.log('alta lectura:', (await post('/api/usuarios', { usuario: 'claude.lectura', clave: 'Lectura-1234', rol: 'lectura' }, ck)).j);
+x = await post('/api/login', { usuario: 'claude.lectura', clave: 'Lectura-1234' }); const cl = x.r.headers.get('set-cookie').split(';')[0];
+const el = await (await fetch(B + '/api/estado', { headers: { cookie: cl } })).json();
+console.log('lectura: rol', el.rol, '· ve mix', !!el.metas.mix, '· objetivo mes', JSON.stringify(el.metas.mes), '· días', el.dias.length);
+console.log('lectura guardar:', (await post('/api/guardar', { metas: {} }, cl)).r.status, '· dias:', (await post('/api/dias', { dias: [] }, cl)).r.status, '· usuarios:', (await fetch(B + '/api/usuarios', { headers: { cookie: cl } })).status);
+const b2 = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }); const c2 = await b2.newContext({ viewport: { width: 1100, height: 900 } });
+await c2.route('https://fonts.googleapis.com/**', r => r.fulfill({ contentType: 'text/css', body: '' })); await c2.route('**/xlsx.full.min.js', r => r.fulfill({ contentType: 'text/javascript', body: '' }));
+const p2 = await c2.newPage(); p2.on('pageerror', er => console.log('ERR', er.message));
+await p2.goto(B + '/'); await p2.waitForSelector('#f-login'); await p2.fill('#lg-u', 'claude.lectura'); await p2.fill('#lg-p', 'Lectura-1234'); await p2.click('#lg-b'); await p2.waitForTimeout(1500);
+console.log('UI lectura: formulario', await p2.$('#adm') ? 'visible' : 'oculto', '· pestaña mix', !!(await p2.$('.pills button[data-p="mix"]')));
+await p2.click('.pills button[data-p="mix"]'); await p2.waitForTimeout(500); await p2.click('.pills button[data-p="mes"]'); await p2.waitForTimeout(500);
+await b2.close();

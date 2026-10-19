@@ -343,9 +343,9 @@ function mixSection(){
 }
 function bindMix(){
   if(VIEW.periodo!=='mix'||!mixCfg()) return; var M=mixCfg(), c=null;
-  document.querySelectorAll('.simsrc').forEach(function(b){b.onclick=function(){var s=b.dataset.s,src=s==='base'?M.base:(s==='real'?(c=c||mixCalc()).sh:M.objetivos[s.slice(4)]);VIEW.sim.src=s;VIEW.sim.sh=Object.assign({},src);if(s==='base'){VIEW.sim.vacUp=0;VIEW.sim.vacExtra=0;}else if(s.indexOf('obj-')===0){var kk=s.slice(4);VIEW.sim.vacUp=+((M.precioVac||{})[kk]||0);VIEW.sim.vacExtra=+((M.mejoraVac||{})[kk]||0);}VIEW.adminOpen=$('#adm').open;render();};});
-  document.querySelectorAll('.simsh').forEach(function(i){i.onchange=function(){VIEW.sim.sh[i.dataset.k]=Math.max(0,+i.value||0);VIEW.sim.src=null;VIEW.adminOpen=$('#adm').open;render();};});
-  [['#sim-v','ventas'],['#sim-f','fijos'],['#sim-p','vacUp'],['#sim-x','vacExtra']].forEach(function(x){var el=$(x[0]);if(el) el.onchange=function(){VIEW.sim[x[1]]=+el.value||0;VIEW.adminOpen=$('#adm').open;render();};});
+  document.querySelectorAll('.simsrc').forEach(function(b){b.onclick=function(){var s=b.dataset.s,src=s==='base'?M.base:(s==='real'?(c=c||mixCalc()).sh:M.objetivos[s.slice(4)]);VIEW.sim.src=s;VIEW.sim.sh=Object.assign({},src);if(s==='base'){VIEW.sim.vacUp=0;VIEW.sim.vacExtra=0;}else if(s.indexOf('obj-')===0){var kk=s.slice(4);VIEW.sim.vacUp=+((M.precioVac||{})[kk]||0);VIEW.sim.vacExtra=+((M.mejoraVac||{})[kk]||0);}VIEW.adminOpen=!!($('#adm')&&$('#adm').open);render();};});
+  document.querySelectorAll('.simsh').forEach(function(i){i.onchange=function(){VIEW.sim.sh[i.dataset.k]=Math.max(0,+i.value||0);VIEW.sim.src=null;VIEW.adminOpen=!!($('#adm')&&$('#adm').open);render();};});
+  [['#sim-v','ventas'],['#sim-f','fijos'],['#sim-p','vacUp'],['#sim-x','vacExtra']].forEach(function(x){var el=$(x[0]);if(el) el.onchange=function(){VIEW.sim[x[1]]=+el.value||0;VIEW.adminOpen=!!($('#adm')&&$('#adm').open);render();};});
 }
 function mixAdmin(){
   var M=mixCfg(); if(!M) return ''; var key=mesClave(), O=mixObj(key), P=mixPic(key);
@@ -570,7 +570,7 @@ function render(){
 
   // admin
   var espTxt=Object.keys(M.especiales).sort().map(function(k){return k.split('-').reverse().join('/')+' = '+M.especiales[k];}).join('\n');
-  h+='<details class="admin" id="adm"'+(VIEW.adminOpen?' open':'')+'><summary>Cargar ventas del día y metas (Joaquín)</summary><div class="grid">'+
+  if(SES.rol!=='lectura') h+='<details class="admin" id="adm"'+(VIEW.adminOpen?' open':'')+'><summary>Cargar ventas del día y metas (Joaquín)</summary><div class="grid">'+
     '<div class="note"><b>1. Todos los días: cargar las ventas de ayer</b><span>En Odoo: Punto de Venta → Reportes → Análisis de ventas → vista de lista, filtrar la fecha de ayer y exportar a Excel con Fecha de la orden, Orden, Variante del producto, Cliente y Total. También se puede subir una semana entera: los días repetidos se reemplazan.</span></div>'+
     '<input type="file" id="f-xlsx" accept=".xlsx,.xls" aria-label="Archivo de ventas de Odoo"><div class="msg" id="m-xlsx"></div>'+
     '<div class="note"><b>2. Metas por día de la semana</b><span>Clientes, ticket promedio y % de tickets con 2+ productos para cada día. En las reglas se carga un mínimo: cada día se usa el mayor entre ese mínimo y lo que ya se logra ese día más 15%.</span></div>'+
@@ -596,11 +596,11 @@ function render(){
      '<span>Verde: meta cumplida. Amarillo: hasta 5% debajo. Rojo: más de 5% debajo.</span></footer>';
   document.getElementById('app').innerHTML=h;
   bindModo();
-  document.querySelectorAll('.pills button').forEach(function(b){b.onclick=function(){VIEW.periodo=b.dataset.p;VIEW.adminOpen=$('#adm').open;render();};});
-  document.querySelectorAll('.nb').forEach(function(b){b.onclick=function(){var w=+b.dataset.w;VIEW.wk=w===0?0:VIEW.wk+w;VIEW.adminOpen=$('#adm').open;render();};});
-  $('#f-xlsx').onchange=onFile; $('#b-save').onclick=function(){onSave('b-save','m-save');}; bindPlan(); bind7(); bindMix(); bindUsuarios();
-  $('#adm').ontoggle=function(){VIEW.adminOpen=this.open;};
-  if(VIEW.msgX){$('#m-xlsx').className='msg '+(VIEW.msgX[0]||'');$('#m-xlsx').textContent=VIEW.msgX[1];}
+  document.querySelectorAll('.pills button').forEach(function(b){b.onclick=function(){VIEW.periodo=b.dataset.p;VIEW.adminOpen=!!($('#adm')&&$('#adm').open);render();};});
+  document.querySelectorAll('.nb').forEach(function(b){b.onclick=function(){var w=+b.dataset.w;VIEW.wk=w===0?0:VIEW.wk+w;VIEW.adminOpen=!!($('#adm')&&$('#adm').open);render();};});
+  if($('#adm')){$('#f-xlsx').onchange=onFile; $('#b-save').onclick=function(){onSave('b-save','m-save');}; bindUsuarios(); $('#adm').ontoggle=function(){VIEW.adminOpen=this.open;};}
+  bindPlan(); bind7(); bindMix();
+  if($('#m-xlsx')&&VIEW.msgX){$('#m-xlsx').className='msg '+(VIEW.msgX[0]||'');$('#m-xlsx').textContent=VIEW.msgX[1];}
   drawChart();
 }
 
@@ -643,11 +643,12 @@ function onFile(ev){
 
 // ---- usuarios y contraseñas (encargado) ----
 function usuariosAdmin(){
-  var L=VIEW.usuarios, ops=(L||[]).filter(function(u){return u.rol==='equipo'||u.usuario===SES.usuario||SES.rol==='admin';});
+  var L=VIEW.usuarios, ops=(L||[]).filter(function(u){return u.rol==='equipo'||u.rol==='lectura'||u.usuario===SES.usuario||SES.rol==='admin';});
   var lista=L?(L.length?L.map(function(u){return '<span><b>'+esc(u.usuario)+'</b> · '+esc(u.rol)+(u.ultimo_ingreso?' · último ingreso '+fcorta(String(u.ultimo_ingreso).slice(0,10)):' · nunca ingresó')+'</span>';}).join(''):'<span>No hay usuarios.</span>'):'<span>Cargando usuarios…</span>';
-  return '<div class="note"><b>5. Usuarios y contraseñas</b><span>Cambiá la contraseña del usuario del equipo o la tuya. Para un usuario nuevo del equipo, elegí "Usuario nuevo" y escribí el nombre.</span>'+lista+'</div>'+
-    '<div class="fields"><label for="us-sel">Usuario<select id="us-sel">'+ops.map(function(u){return '<option value="'+esc(u.usuario)+'">'+esc(u.usuario)+'</option>';}).join('')+'<option value="">Usuario nuevo del equipo…</option></select></label>'+
+  return '<div class="note"><b>5. Usuarios y contraseñas</b><span>Cambiá la contraseña del usuario del equipo o la tuya. Para crear uno, elegí "Usuario nuevo…", escribí el nombre y elegí el tipo.</span>'+lista+'</div>'+
+    '<div class="fields"><label for="us-sel">Usuario<select id="us-sel">'+ops.map(function(u){return '<option value="'+esc(u.usuario)+'">'+esc(u.usuario)+'</option>';}).join('')+'<option value="">Usuario nuevo…</option></select></label>'+
     '<label for="us-nuevo">Nombre del usuario nuevo<input id="us-nuevo" type="text" autocapitalize="none" spellcheck="false" placeholder="ej. equipo.local"></label>'+
+    '<label for="us-rol">Tipo de usuario nuevo<select id="us-rol"><option value="equipo">Equipo (solo lo del día)</option><option value="lectura">Solo lectura (ve todo, no puede cargar ni guardar)</option></select></label>'+
     '<label for="us-clave">Contraseña nueva (8 o más caracteres)<input id="us-clave" type="text" autocomplete="new-password" spellcheck="false"></label>'+
     '<div><button class="btn sec" id="us-gen" type="button">Generar una</button></div></div>'+
     '<div><button class="btn" id="us-save" type="button">Guardar contraseña</button></div><div class="msg" id="us-m" role="status"></div>';
@@ -665,7 +666,7 @@ function bindUsuarios(){
     if(!u){m.className='msg err';m.textContent='Elegí un usuario o escribí el nombre del nuevo.';return;}
     if(c.length<8){m.className='msg err';m.textContent='La contraseña tiene que tener al menos 8 caracteres.';return;}
     b.disabled=true; m.className='msg'; m.textContent='Guardando…';
-    api('/api/usuarios',{method:'POST',body:{usuario:u,clave:c}}).then(function(j){
+    api('/api/usuarios',{method:'POST',body:{usuario:u,clave:c,rol:$('#us-sel').value?undefined:$('#us-rol').value}}).then(function(j){
       b.disabled=false; m.className='msg ok'; m.textContent=(j.creado?'Usuario '+j.usuario+' creado':'Contraseña de '+j.usuario+' cambiada')+'. Anotala ahora: no se vuelve a mostrar.';
       if(j.creado){VIEW.usuarios=null;VIEW._usCargando=false;}
     }).catch(function(e){b.disabled=false;if(e.status===401) return pantallaLogin('Tu sesión venció. Volvé a ingresar.');m.className='msg err';m.textContent=e.message||'No se pudo guardar.';});
